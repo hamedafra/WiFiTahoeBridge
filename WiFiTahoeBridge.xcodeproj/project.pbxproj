@@ -11,6 +11,7 @@
 		CE405ED91E4A080700AA0B3D /* plugin_start.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE405ED81E4A080700AA0B3D /* plugin_start.cpp */; };
 		CE8DA0A42517CE8B008C44E8 /* libkmod.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CE8DA0A32517CE8B008C44E8 /* libkmod.a */; };
 		F6C535E81E60963800A3A34B /* kern_bridge.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F6C535E61E60963800A3A34B /* kern_bridge.cpp */; };
+		AA00000300000000000000A1 /* kern_apiclient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA00000300000000000000A0 /* kern_apiclient.cpp */; };
 		F6C535E91E60963800A3A34B /* kern_bridge.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F6C535E71E60963800A3A34B /* kern_bridge.hpp */; };
 /* End PBXBuildFile section */
 
@@ -48,6 +49,7 @@
 		CE405EDA1E4A080F00AA0B3D /* plugin_start.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = plugin_start.hpp; sourceTree = "<group>"; };
 		CE8DA0A32517CE8B008C44E8 /* libkmod.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libkmod.a; path = ../Lilu/MacKernelSDK/Library/x86_64/libkmod.a; sourceTree = "<group>"; };
 		F6C535E61E60963800A3A34B /* kern_bridge.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kern_bridge.cpp; sourceTree = "<group>"; usesTabs = 1; };
+		AA00000300000000000000A0 /* kern_apiclient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kern_apiclient.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		F6C535E71E60963800A3A34B /* kern_bridge.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kern_bridge.hpp; sourceTree = "<group>"; usesTabs = 1; };
 /* End PBXFileReference section */
 
@@ -86,6 +88,7 @@
 			isa = PBXGroup;
 			children = (
 				F6C535E61E60963800A3A34B /* kern_bridge.cpp */,
+				AA00000300000000000000A0 /* kern_apiclient.cpp */,
 				F6C535E71E60963800A3A34B /* kern_bridge.hpp */,
 				1C748C2C1C21952C0024EED2 /* kern_start.cpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
@@ -249,6 +252,7 @@
 			files = (
 				CE405ED91E4A080700AA0B3D /* plugin_start.cpp in Sources */,
 				F6C535E81E60963800A3A34B /* kern_bridge.cpp in Sources */,
+				AA00000300000000000000A1 /* kern_apiclient.cpp in Sources */,
 				1C748C2D1C21952C0024EED2 /* kern_start.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -382,7 +386,7 @@
 				MODULE_NAME = com.hamedafra.WiFiTahoeBridge;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.2.0;
+				MODULE_VERSION = 0.3.0;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -432,7 +436,7 @@
 				MODULE_NAME = com.hamedafra.WiFiTahoeBridge;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.2.0;
+				MODULE_VERSION = 0.3.0;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",

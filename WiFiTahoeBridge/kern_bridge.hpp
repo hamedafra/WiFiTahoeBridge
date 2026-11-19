@@ -18,10 +18,12 @@
 #pragma once
 
 #include <Headers/kern_patcher.hpp>
+#include <IOKit/IOUserClient.h>
 
 class WTBridge {
 public:
 	void init();
+	static WTBridge *shared();
 
 	// apple80211req as the ioctl carries it
 	struct Req {
@@ -41,10 +43,18 @@ public:
 	static constexpr uint32_t AssocLegacy      = 592;
 	static constexpr uint32_t AssocTahoe       = 908;
 
+	// IO80211VirtualInterface::getBSDName(), resolved from the legacy family
+	const char *bsdName(void *virtualInterface) const;
+
 private:
 	void processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
 
 	static int wrapPerformCommand(void *that, void *controller, unsigned long cmd, void *arg0, void *arg1);
+	static IOReturn wrapNewUserClient(void *that, task_t task, void *securityID, uint32_t type, OSDictionary *props, IOUserClient **handler);
+	static void wrapVirtualPostMessage(void *that, unsigned int msg, void *data, unsigned long len);
 
 	mach_vm_address_t orgPerformCommand {0};
+	mach_vm_address_t orgNewUserClient {0};
+	mach_vm_address_t orgVirtualPostMessage {0};
+	mach_vm_address_t symGetBSDName {0};
 };

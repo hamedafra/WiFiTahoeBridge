@@ -9,6 +9,7 @@
 #include <sys/errno.h>
 
 #include "kern_bridge.hpp"
+#include "kern_apiclient.hpp"
 
 #include <libkern/copyio.h>
 #include <string.h>
@@ -25,8 +26,17 @@ static KernelPatcher::KextInfo kextList[] {
 	{ "com.apple.iokit.IO80211FamilyLegacy", pathLegacy, arrsize(pathLegacy), {true}, {}, KernelPatcher::KextInfo::Unloaded },
 };
 
+extern int wtbAwdlEnabled;
+
+WTBridge *WTBridge::shared() { return callbackBridge; }
+
+const char *WTBridge::bsdName(void *virtualInterface) const {
+	return symGetBSDName ? reinterpret_cast<const char *(*)(void *)>(symGetBSDName)(virtualInterface) : nullptr;
+}
+
 void WTBridge::init() {
 	callbackBridge = this;
+	WTBAPIUserClient::globalInit();
 	SYSLOG("WTB", "WiFiTahoeBridge %s starting", xStringify(MODULE_VERSION));
 	lilu.onKextLoadForce(kextList, arrsize(kextList),
 		[](void *user, KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
@@ -46,6 +56,26 @@ void WTBridge::processKext(KernelPatcher &patcher, size_t index, mach_vm_address
 	else {
 		SYSLOG("WTB", "failed to route IO80211Interface::performCommand (%d)", patcher.getError());
 		patcher.clearError();
+	}
+
+	// AWDL: Tahoe's wifip2pd needs the modern API user client on the AWDL interface, and the legacy family's
+	// events for it. Kept apart from the Wi-Fi route above so a failure here leaves Wi-Fi alone.
+	symGetBSDName = patcher.solveSymbol(index, "__ZN23IO80211VirtualInterface10getBSDNameEv", address, size);
+	if (!symGetBSDName) {
+		SYSLOG("WTB", "IO80211VirtualInterface::getBSDName not found (%d), AWDL client off", patcher.getError());
+		patcher.clearError();
+		return;
+	}
+	KernelPatcher::RouteRequest awdl[] {
+		{ "__ZN23IO80211VirtualInterface13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient", wrapNewUserClient, orgNewUserClient },
+		{ "__ZN23IO80211VirtualInterface27IO80211InterfacePostMessageEjPvm", wrapVirtualPostMessage, orgVirtualPostMessage },
+	};
+	if (patcher.routeMultiple(index, awdl, address, size))
+		SYSLOG("WTB", "routed the AWDL user client hooks");
+	else {
+		SYSLOG("WTB", "failed to route the AWDL hooks (%d)", patcher.getError());
+		patcher.clearError();
+		symGetBSDName = 0;
 	}
 }
 
@@ -100,4 +130,27 @@ int WTBridge::wrapPerformCommand(void *that, void *controller, unsigned long cmd
 	}
 
 	return org(that, controller, cmd, arg0, arg1);
+}
+
+IOReturn WTBridge::wrapNewUserClient(void *that, task_t task, void *securityID, uint32_t type, OSDictionary *props, IOUserClient **handler) {
+	auto bridge = callbackBridge;
+	if (type == 0 && wtbAwdlEnabled && handler && bridge->symGetBSDName) {
+		const char *name = bridge->bsdName(that);
+		if (name && !strncmp(name, "awdl", 4)) {
+			auto provider = static_cast<IOService *>(that);
+			auto client = new WTBAPIUserClient;
+			if (!client) return kIOReturnNoMemory;
+			if (!client->initWithTask(task, securityID, type, props)) { client->release(); return kIOReturnNotPermitted; }
+			if (!client->attach(provider)) { client->release(); return kIOReturnError; }
+			if (!client->start(provider)) { client->detach(provider); client->release(); return kIOReturnError; }
+			*handler = client;
+			return kIOReturnSuccess;
+		}
+	}
+	return FunctionCast(wrapNewUserClient, bridge->orgNewUserClient)(that, task, securityID, type, props, handler);
+}
+
+void WTBridge::wrapVirtualPostMessage(void *that, unsigned int msg, void *data, unsigned long len) {
+	WTBAPIUserClient::postToClients(that, msg, data, len);
+	FunctionCast(wrapVirtualPostMessage, callbackBridge->orgVirtualPostMessage)(that, msg, data, len);
 }
