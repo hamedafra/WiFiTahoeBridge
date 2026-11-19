@@ -21,8 +21,11 @@
 #include <IOKit/IOLocks.h>
 #include <net/kpi_interface.h>
 
-class WTBAPIUserClient : public IOUserClient {
-	OSDeclareDefaultStructors(WTBAPIUserClient)
+// The class carries Apple's name on purpose: wifip2pd is sandboxed and may only open the user-client classes named in
+// its entitlement (IO80211APIUserClient is one of them). The modern IO80211Family that owns this name cannot load
+// next to IO80211FamilyLegacy, so the name is free.
+class IO80211APIUserClient : public IOUserClient {
+	OSDeclareDefaultStructors(IO80211APIUserClient)
 
 public:
 	static constexpr uint32_t RingSize    = 0x4b000;

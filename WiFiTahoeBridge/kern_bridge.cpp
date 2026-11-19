@@ -36,7 +36,7 @@ const char *WTBridge::bsdName(void *virtualInterface) const {
 
 void WTBridge::init() {
 	callbackBridge = this;
-	WTBAPIUserClient::globalInit();
+	IO80211APIUserClient::globalInit();
 	SYSLOG("WTB", "WiFiTahoeBridge %s starting", xStringify(MODULE_VERSION));
 	lilu.onKextLoadForce(kextList, arrsize(kextList),
 		[](void *user, KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
@@ -138,7 +138,7 @@ IOReturn WTBridge::wrapNewUserClient(void *that, task_t task, void *securityID, 
 		const char *name = bridge->bsdName(that);
 		if (name && !strncmp(name, "awdl", 4)) {
 			auto provider = static_cast<IOService *>(that);
-			auto client = new WTBAPIUserClient;
+			auto client = new IO80211APIUserClient;
 			if (!client) return kIOReturnNoMemory;
 			if (!client->initWithTask(task, securityID, type, props)) { client->release(); return kIOReturnNotPermitted; }
 			if (!client->attach(provider)) { client->release(); return kIOReturnError; }
@@ -151,6 +151,6 @@ IOReturn WTBridge::wrapNewUserClient(void *that, task_t task, void *securityID, 
 }
 
 void WTBridge::wrapVirtualPostMessage(void *that, unsigned int msg, void *data, unsigned long len) {
-	WTBAPIUserClient::postToClients(that, msg, data, len);
+	IO80211APIUserClient::postToClients(that, msg, data, len);
 	FunctionCast(wrapVirtualPostMessage, callbackBridge->orgVirtualPostMessage)(that, msg, data, len);
 }

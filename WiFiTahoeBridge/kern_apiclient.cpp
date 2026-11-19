@@ -14,7 +14,7 @@
 #include "kern_apiclient.hpp"
 #include "kern_bridge.hpp"
 
-OSDefineMetaClassAndStructors(WTBAPIUserClient, IOUserClient)
+OSDefineMetaClassAndStructors(IO80211APIUserClient, IOUserClient)
 
 // debug.wtb_awdl: 1 lets the AWDL interface hand out this client. Off after every boot unless -wtbawdl is given,
 // so a fault in this code cannot turn into a boot loop.
@@ -28,10 +28,10 @@ SYSCTL_INT(_debug, OID_AUTO, wtb_awdl_drops, CTLFLAG_RD | CTLFLAG_LOCKED, &statD
 SYSCTL_INT(_debug, OID_AUTO, wtb_awdl_lasterr, CTLFLAG_RD | CTLFLAG_LOCKED, &statLastError, 0, "");
 
 static constexpr size_t MaxClients = 4;
-static WTBAPIUserClient *clients[MaxClients] {};
+static IO80211APIUserClient *clients[MaxClients] {};
 static IOSimpleLock *registryLock {nullptr};   // clients[], and each client's ring writer and async reference
 
-void WTBAPIUserClient::globalInit() {
+void IO80211APIUserClient::globalInit() {
 	registryLock = IOSimpleLockAlloc();
 	if (!registryLock) return;
 	if (checkKernelArgument("-wtbawdl")) wtbAwdlEnabled = 1;
@@ -43,7 +43,7 @@ void WTBAPIUserClient::globalInit() {
 	sysctl_register_oid(&sysctl__debug_wtb_awdl_lasterr);
 }
 
-bool WTBAPIUserClient::initWithTask(task_t owningTask, void *securityID, UInt32 type, OSDictionary *properties) {
+bool IO80211APIUserClient::initWithTask(task_t owningTask, void *securityID, UInt32 type, OSDictionary *properties) {
 	if (!IOUserClient::initWithTask(owningTask, securityID, type, properties)) return false;
 	// Apple's client wants the com.apple.wlan.authentication entitlement; the only caller we serve is wifip2pd (root).
 	if (!owningTask || clientHasPrivilege(securityID, kIOClientPrivilegeAdministrator) != kIOReturnSuccess) return false;
@@ -51,7 +51,7 @@ bool WTBAPIUserClient::initWithTask(task_t owningTask, void *securityID, UInt32 
 	return true;
 }
 
-bool WTBAPIUserClient::start(IOService *provider) {
+bool IO80211APIUserClient::start(IOService *provider) {
 	if (!registryLock || !IOUserClient::start(provider)) return false;
 	fProvider = provider;
 	setProperty("IOUserClientDefaultLocking", kOSBooleanTrue);
@@ -85,7 +85,7 @@ bool WTBAPIUserClient::start(IOService *provider) {
 	return true;
 }
 
-void WTBAPIUserClient::stop(IOService *provider) {
+void IO80211APIUserClient::stop(IOService *provider) {
 	OSAsyncReference64 ref; bool hadRef = false;
 	if (registryLock) {
 		IOInterruptState st = IOSimpleLockLockDisableInterrupt(registryLock);
@@ -98,7 +98,7 @@ void WTBAPIUserClient::stop(IOService *provider) {
 	IOUserClient::stop(provider);
 }
 
-void WTBAPIUserClient::free() {
+void IO80211APIUserClient::free() {
 	OSSafeReleaseNULL(fScratchMap);
 	OSSafeReleaseNULL(fScratch);
 	OSSafeReleaseNULL(fRing);
@@ -108,12 +108,12 @@ void WTBAPIUserClient::free() {
 	IOUserClient::free();
 }
 
-IOReturn WTBAPIUserClient::clientClose() {
+IOReturn IO80211APIUserClient::clientClose() {
 	terminate();
 	return kIOReturnSuccess;
 }
 
-IOReturn WTBAPIUserClient::clientMemoryForType(UInt32 type, IOOptionBits *options, IOMemoryDescriptor **memory) {
+IOReturn IO80211APIUserClient::clientMemoryForType(UInt32 type, IOOptionBits *options, IOMemoryDescriptor **memory) {
 	IOBufferMemoryDescriptor *m = type == 1 ? fRing : type == 2 ? fState : nullptr;
 	if (!m || !memory) return kIOReturnError;
 	m->retain();
@@ -122,7 +122,7 @@ IOReturn WTBAPIUserClient::clientMemoryForType(UInt32 type, IOOptionBits *option
 	return kIOReturnSuccess;
 }
 
-IOReturn WTBAPIUserClient::monitorInit() {
+IOReturn IO80211APIUserClient::monitorInit() {
 	IOLockLock(fLock);
 	if (!fRing) {
 		auto ring = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, kIODirectionInOut | kIOMemoryKernelUserShared, RingSize, page_size);
@@ -143,7 +143,7 @@ IOReturn WTBAPIUserClient::monitorInit() {
 	return kIOReturnSuccess;
 }
 
-IOReturn WTBAPIUserClient::runCommand(IOExternalMethodArguments *args) {
+IOReturn IO80211APIUserClient::runCommand(IOExternalMethodArguments *args) {
 	IOMemoryDescriptor *inMD = args->structureInputDescriptor;
 	uint64_t inSize = inMD ? inMD->getLength() : args->structureInputSize;
 	if (inSize < RequestSize || (!inMD && !args->structureInput) || !fIfp || !fScratchUser) return kIOReturnBadArgument;
@@ -216,7 +216,7 @@ IOReturn WTBAPIUserClient::runCommand(IOExternalMethodArguments *args) {
 	return ret;   // an errno, as the real client returns it
 }
 
-IOReturn WTBAPIUserClient::externalMethod(uint32_t selector, IOExternalMethodArguments *args, IOExternalMethodDispatch *dispatch,
+IOReturn IO80211APIUserClient::externalMethod(uint32_t selector, IOExternalMethodArguments *args, IOExternalMethodDispatch *dispatch,
 										  OSObject *target, void *reference) {
 	if (!args || isInactive() || !fLock) return kIOReturnNotAttached;
 	switch (selector) {
@@ -256,7 +256,7 @@ IOReturn WTBAPIUserClient::externalMethod(uint32_t selector, IOExternalMethodArg
 	}
 }
 
-void WTBAPIUserClient::pushEvent(uint32_t msg, const void *data, size_t len) {
+void IO80211APIUserClient::pushEvent(uint32_t msg, const void *data, size_t len) {
 	if (len > MaxEvent || (len && !data)) { statDrops++; return; }
 	clock_sec_t secs = 0; clock_usec_t usecs = 0;
 	clock_get_calendar_microtime(&secs, &usecs);
@@ -300,9 +300,9 @@ void WTBAPIUserClient::pushEvent(uint32_t msg, const void *data, size_t len) {
 	if (notify) sendAsyncResult64WithOptions(ref, kIOReturnSuccess, nullptr, 0, kIOUserNotifyOptionCanDrop);
 }
 
-void WTBAPIUserClient::postToClients(void *provider, uint32_t msg, const void *data, size_t len) {
+void IO80211APIUserClient::postToClients(void *provider, uint32_t msg, const void *data, size_t len) {
 	if (!registryLock) return;
-	WTBAPIUserClient *list[MaxClients]; size_t count = 0;
+	IO80211APIUserClient *list[MaxClients]; size_t count = 0;
 	IOInterruptState st = IOSimpleLockLockDisableInterrupt(registryLock);
 	for (size_t i = 0; i < MaxClients; i++)
 		if (clients[i] && clients[i]->fProvider == provider && clients[i]->fMonitoring) { clients[i]->retain(); list[count++] = clients[i]; }
