@@ -15,6 +15,7 @@
 #include <string.h>
 
 extern "C" int proc_selfpid(void);
+extern "C" void proc_selfname(char *buf, int size);
 
 static WTBridge *callbackBridge {nullptr};
 
@@ -135,8 +136,14 @@ int WTBridge::wrapPerformCommand(void *that, void *controller, unsigned long cmd
 IOReturn WTBridge::wrapNewUserClient(void *that, task_t task, void *securityID, uint32_t type, OSDictionary *props, IOUserClient **handler) {
 	auto bridge = callbackBridge;
 	if (type == 0 && wtbAwdlEnabled && handler && bridge->symGetBSDName) {
+		// Only wifip2pd gets the new client. airportd also binds to awdl0; given a working user client there it
+		// treats awdl0 as a second Wi-Fi interface and its auto-join stops with "driver not available", so it keeps
+		// the old ioctl path, as in the configuration AirDrop was tested with. (newUserClient runs in the caller's
+		// context, so proc_selfname is the process calling IOServiceOpen.)
+		char caller[32] {};
+		proc_selfname(caller, sizeof(caller));
 		const char *name = bridge->bsdName(that);
-		if (name && !strncmp(name, "awdl", 4)) {
+		if (name && !strncmp(name, "awdl", 4) && !strcmp(caller, "wifip2pd")) {
 			auto provider = static_cast<IOService *>(that);
 			auto client = new IO80211APIUserClient;
 			if (!client) return kIOReturnNoMemory;

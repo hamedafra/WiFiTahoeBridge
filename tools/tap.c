@@ -8,6 +8,8 @@
 #include <sys/ioctl.h>
 struct a80211req { char ifname[16]; int type; int val; unsigned len; void *data; };
 static FILE *out;
+// Open the log before main(): a sandboxed process cannot open it later.
+__attribute__((constructor)) static void tap_init(void) { const char *f = getenv("TAP_OUT"); out = f ? fopen(f, "w") : stderr; if (!out) out = stderr; }
 static void hex(const char *tag, const unsigned char *p, unsigned n) {
     fprintf(out, "%s %u ", tag, n);
     for (unsigned i = 0; i < n; i++) fprintf(out, "%02x", p[i]);
@@ -20,7 +22,7 @@ int tap_ioctl(int fd, unsigned long req, ...) {
     if (!out) { const char *f = getenv("TAP_OUT"); out = f ? fopen(f, "w") : stderr; }
     struct a80211req *r = arg;
     unsigned n = r->len > 0x8000 ? 0x8000 : r->len;
-    fprintf(out, "REQ %s type=%d val=%d len=%u\n", nr == 200 ? "SET" : "GET", r->type, r->val, r->len);
+    fprintf(out, "REQ %s type=%d val=%d len=%u if=%.16s\n", nr == 200 ? "SET" : "GET", r->type, r->val, r->len, r->ifname);
     if (r->data && n) hex("IN", r->data, n);
     int ret;
     if (getenv("TAP_SHIM") && nr == 201 && r->type == 11 && r->len == 0x8e0) {
@@ -48,3 +50,21 @@ int tap_ioctl(int fd, unsigned long req, ...) {
     return ret;
 }
 __attribute__((used, section("__DATA,__interpose"))) static struct { void *n, *o; } tup = { (void *)tap_ioctl, (void *)ioctl };
+
+// TAP_NOSANDBOX=1: let a daemon copy run without entering its sandbox, so it can open the same IOKit clients.
+extern int sandbox_init_with_parameters(const char *, unsigned long long, const char *const [], char **);
+int nosandbox(const char *p, unsigned long long f, const char *const a[], char **e) {
+    if (getenv("TAP_NOSANDBOX")) { if (e) *e = 0; return 0; }
+    return sandbox_init_with_parameters(p, f, a, e);
+}
+__attribute__((used, section("__DATA,__interpose"))) static struct { void *n, *o; } tup2 = { (void *)nosandbox, (void *)sandbox_init_with_parameters };
+
+// TAP_FAKEPREFS=1: pretend SCPreferences locking and committing work, so an unentitled daemon copy keeps going
+// (nothing is written).
+#include <SystemConfiguration/SystemConfiguration.h>
+static Boolean fake_lock(SCPreferencesRef p, Boolean w) { return getenv("TAP_FAKEPREFS") ? 1 : SCPreferencesLock(p, w); }
+static Boolean fake_unlock(SCPreferencesRef p) { return getenv("TAP_FAKEPREFS") ? 1 : SCPreferencesUnlock(p); }
+static Boolean fake_commit(SCPreferencesRef p) { return getenv("TAP_FAKEPREFS") ? 1 : SCPreferencesCommitChanges(p); }
+static Boolean fake_apply(SCPreferencesRef p) { return getenv("TAP_FAKEPREFS") ? 1 : SCPreferencesApplyChanges(p); }
+#define IPOSE(n, o) __attribute__((used, section("__DATA,__interpose"))) static struct { void *a, *b; } ip_##n = { (void *)n, (void *)o };
+IPOSE(fake_lock, SCPreferencesLock) IPOSE(fake_unlock, SCPreferencesUnlock) IPOSE(fake_commit, SCPreferencesCommitChanges) IPOSE(fake_apply, SCPreferencesApplyChanges)

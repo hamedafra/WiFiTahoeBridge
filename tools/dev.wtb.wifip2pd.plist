@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>dev.wtb.wifip2pd</string>
+	<key>Program</key><string>/var/tmp/wtb/p2pd</string>
+	<key>ProcessType</key><string>Adaptive</string>
+	<key>MachServices</key><dict><key>com.apple.wifip2pd</key><true/></dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>DYLD_INSERT_LIBRARIES</key><string>/var/tmp/wtb/tap.dylib:/var/tmp/wtb/iouc.dylib</string>
+		<key>TAP_OUT</key><string>/var/tmp/wtb/log/p2pd.tap</string>
+		<key>TAP_FAKEPREFS</key><string>1</string>
+		<key>IOUC_LOG</key><string>/var/tmp/wtb/log/iouc.log</string>
+		<key>IOUC_EMU</key><string>1</string>
+		<key>IOUC_SEL1</key><string>1</string>
+		<key>IOUC_SEL5</key><string>1</string>
+		<key>IOUC_SEL7</key><string>0</string>
+	</dict>
+	<key>StandardOutPath</key><string>/var/tmp/wtb/log/p2pd.out</string>
+	<key>StandardErrorPath</key><string>/var/tmp/wtb/log/p2pd.out</string>
+</dict>
+</plist>

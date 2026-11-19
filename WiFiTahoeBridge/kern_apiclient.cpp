@@ -16,9 +16,10 @@
 
 OSDefineMetaClassAndStructors(IO80211APIUserClient, IOUserClient)
 
-// debug.wtb_awdl: 1 lets the AWDL interface hand out this client. Off after every boot unless -wtbawdl is given,
-// so a fault in this code cannot turn into a boot loop.
-int wtbAwdlEnabled = 0;
+// debug.wtb_awdl: 1 lets the AWDL interface hand out this client (AirDrop, AirPlay to Mac, Sidecar...). On by default;
+// off with the boot argument -wtbawdloff, in safe mode (-x) and in the installer/recovery. It can also be switched at
+// run time: sudo sysctl debug.wtb_awdl=0|1, then sudo launchctl kickstart -k system/com.apple.wifip2pd.
+int wtbAwdlEnabled = 1;
 static int statOpens = 0, statRequests = 0, statEvents = 0, statDrops = 0, statLastError = 0;
 SYSCTL_INT(_debug, OID_AUTO, wtb_awdl, CTLFLAG_RW | CTLFLAG_LOCKED, &wtbAwdlEnabled, 0, "WiFiTahoeBridge: API user client on AWDL");
 SYSCTL_INT(_debug, OID_AUTO, wtb_awdl_opens, CTLFLAG_RD | CTLFLAG_LOCKED, &statOpens, 0, "");
@@ -34,7 +35,10 @@ static IOSimpleLock *registryLock {nullptr};   // clients[], and each client's r
 void IO80211APIUserClient::globalInit() {
 	registryLock = IOSimpleLockAlloc();
 	if (!registryLock) return;
-	if (checkKernelArgument("-wtbawdl")) wtbAwdlEnabled = 1;
+	if (checkKernelArgument("-wtbawdloff") || checkKernelArgument("-x") ||
+		(lilu.getRunMode() & (LiluAPI::RunningSafeMode | LiluAPI::RunningInstallerRecovery)))
+		wtbAwdlEnabled = 0;
+	SYSLOG("WTB", "AWDL user client %s", wtbAwdlEnabled ? "on" : "off");
 	sysctl_register_oid(&sysctl__debug_wtb_awdl);
 	sysctl_register_oid(&sysctl__debug_wtb_awdl_opens);
 	sysctl_register_oid(&sysctl__debug_wtb_awdl_requests);
