@@ -1,0 +1,10 @@
+.DS_Store
+DerivedData
+build
+Lilu.kext
+xcuserdata
+xcshareddata
+project.xcworkspace
+/MacKernelSDK
+*.tap
+pref.txt
